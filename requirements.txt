@@ -1,0 +1,6 @@
+itk>=5.4.0
+vtk>=9.3.0
+numpy>=1.21.0
+matplotlib>=3.5.0
+scipy>=1.7.0
+SimpleITK>=2.2.0

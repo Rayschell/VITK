@@ -1,0 +1,44 @@
+# Script Git personnalisé (ne pas push)
+git_commit_custom.sh
+
+# Environnement virtuel Python
+.venv/
+venv/
+env/
+
+# Fichiers de sortie
+Output/
+*.png
+*.jpg
+*.jpeg
+*.tiff
+*.bmp
+
+# Fichiers Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Fichiers temporaires
+*.tmp
+*.temp
