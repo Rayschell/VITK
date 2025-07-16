@@ -1,30 +1,17 @@
-"""
-ITK/VTK Mini-Project - Étape 1
-Script principal pour le traitement d'images médicales
-"""
-
 import os
 import sys
 import subprocess
 
 def check_python_environment():
-    """Vérifier l'environnement Python"""
-    print("\nVérification de l'environnement Python:")
-    print(f"✓ Python {sys.version}")
-    
-    # Vérifier si pip est disponible
     try:
         subprocess.run(["pip", "--version"], capture_output=True, check=True)
-        print("✓ pip disponible")
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print("✗ pip non disponible")
+        print("pip non disponible")
         return False
 
 def install_dependencies():
-    """Installer les dépendances ITK/VTK"""
-    print("\nInstallation des dépendances:")
-    
+    print("Installation des dependances...")
     dependencies = [
         "itk>=5.4.0",
         "vtk>=9.3.0", 
@@ -34,26 +21,20 @@ def install_dependencies():
     ]
     
     for dep in dependencies:
-        print(f"Installation de {dep}...")
         try:
             subprocess.run([
                 sys.executable, "-m", "pip", "install", dep
             ], check=True, capture_output=True)
-            print(f"✓ {dep} installé avec succès")
-        except subprocess.CalledProcessError as e:
-            print(f"✗ Erreur lors de l'installation de {dep}")
-            print(f"  Erreur: {e}")
+        except subprocess.CalledProcessError:
+            print(f"Erreur installation {dep}")
             return False
     
     return True
 
 def verify_imports():
-    """Vérifier que les modules peuvent être importés"""
-    print("\nVérification des imports:")
-    
     modules = [
-        ("itk", "Insight Toolkit"),
-        ("vtk", "Visualization Toolkit"),
+        ("itk", "ITK"),
+        ("vtk", "VTK"),
         ("numpy", "NumPy"),
         ("matplotlib", "Matplotlib")
     ]
@@ -63,73 +44,134 @@ def verify_imports():
     for module_name, description in modules:
         try:
             __import__(module_name)
-            print(f"✓ {description} ({module_name}) - OK")
-        except ImportError as e:
-            print(f"✗ {description} ({module_name}) - ERREUR: {e}")
+        except ImportError:
+            print(f"{description} non disponible")
             all_success = False
     
     return all_success
 
-def main():
-    """Fonction principale"""
-    print("=" * 60)
-    print("ITK/VTK Mini-Project - Traitement d'Images Médicales")
-    print("=" * 60)
+def load_and_analyze_images():
+    print("Chargement et analyse des images NRRD")
     
-    # Vérifier la structure des dossiers
+    try:
+        import itk
+        import numpy as np
+        
+        image_files = [
+            "Data/case6_gre1.nrrd",
+            "Data/case6_gre2.nrrd"
+        ]
+        
+        results = {}
+        
+        for i, filepath in enumerate(image_files, 1):
+            if not os.path.exists(filepath):
+                print(f"Fichier non trouve: {filepath}")
+                continue
+                
+            print(f"Analyse image {i}: {os.path.basename(filepath)}")
+            
+            try:
+                image = itk.imread(filepath)
+                
+                size = image.GetLargestPossibleRegion().GetSize()
+                spacing = image.GetSpacing()
+                origin = image.GetOrigin()
+                
+                print(f"Dimensions: {size}")
+                print(f"Espacement: {spacing}")
+                
+                stats_filter = itk.StatisticsImageFilter.New(image)
+                stats_filter.Update()
+                
+                min_val = stats_filter.GetMinimum()
+                max_val = stats_filter.GetMaximum()
+                mean_val = stats_filter.GetMean()
+                variance = stats_filter.GetVariance()
+                std_dev = np.sqrt(variance)
+                
+                print(f"Intensites: min={min_val:.2f}, max={max_val:.2f}, moy={mean_val:.2f}")
+                
+                voxel_volume = spacing[0] * spacing[1] * spacing[2]
+                total_voxels = size[0] * size[1] * size[2]
+                physical_volume = voxel_volume * total_voxels
+                
+                print(f"Volume: {physical_volume/1000:.2f} cm³")
+                
+                results[f"image_{i}"] = {
+                    'filepath': filepath,
+                    'image': image,
+                    'size': size,
+                    'spacing': spacing,
+                    'origin': origin,
+                    'min_val': min_val,
+                    'max_val': max_val,
+                    'mean_val': mean_val,
+                    'std_dev': std_dev,
+                    'physical_volume': physical_volume
+                }
+                
+            except Exception as e:
+                print(f"Erreur chargement image: {e}")
+        
+        print(f"Analyse terminee pour {len(results)} image(s)")
+        return results
+        
+    except ImportError as e:
+        print(f"Modules ITK non disponibles: {e}")
+        return None
+
+def main():
+    print("ITK/VTK Mini-Project - Traitement d'Images Medicales")
+    
     directories = ["Data", "Output"]
     
     for directory in directories:
         if not os.path.exists(directory):
             os.makedirs(directory)
-            print(f"✓ Dossier créé: {directory}")
-        else:
-            print(f"✓ Dossier existant: {directory}")
+            print(f"Dossier cree: {directory}")
     
-    # Vérifier les fichiers de données
     data_files = [
         "Data/case6_gre1.nrrd",
         "Data/case6_gre2.nrrd"
     ]
     
-    print("\nVérification des fichiers de données:")
+    print("Verification des fichiers de donnees:")
     for file_path in data_files:
         if os.path.exists(file_path):
             size = os.path.getsize(file_path)
-            print(f"✓ {file_path} ({size:,} bytes)")
+            print(f"{file_path} ({size:,} bytes)")
         else:
-            print(f"✗ {file_path} - MANQUANT")
+            print(f"{file_path} - MANQUANT")
     
-    # Vérifier l'environnement Python
     if not check_python_environment():
-        print("❌ Problème avec l'environnement Python")
+        print("Probleme avec l'environnement Python")
         return False
     
-    # Demander si installer les dépendances
-    print("\n" + "=" * 40)
-    response = input("Voulez-vous installer les dépendances ITK/VTK ? (o/n): ").lower()
+    if not verify_imports():
+        print("Certains modules ne sont pas disponibles")
+        
+        response = input("Voulez-vous installer les dependances ITK/VTK ? (o/n): ").lower()
+        
+        if response == 'o' or response == 'oui':
+            if install_dependencies():
+                print("Dependances installees avec succes!")
+                
+                if not verify_imports():
+                    print("Probleme persistant avec les imports")
+                    return False
+            else:
+                print("Erreur lors de l'installation")
+                return False
     
-    if response == 'o' or response == 'oui':
-        if install_dependencies():
-            print("✅ Toutes les dépendances installées avec succès!")
-        else:
-            print("❌ Erreur lors de l'installation des dépendances")
-            return False
+    results = load_and_analyze_images()
     
-    # Vérifier les imports
-    if verify_imports():
-        print("\n✅ Tous les modules sont disponibles!")
+    if results:
+        print("Configuration et analyse terminees!")
+        return True
     else:
-        print("\n❌ Certains modules ne sont pas disponibles")
-        print("Essayez d'installer les dépendances manuellement:")
-        print("pip install -r requirements.txt")
-    
-    print("\n" + "=" * 60)
-    print("Configuration initiale terminée!")
-    print("Prochaine étape: Chargement et analyse des images NRRD")
-    print("=" * 60)
-    
-    return True
+        print("Echec de l'analyse des images")
+        return False
 
 if __name__ == "__main__":
     success = main()
