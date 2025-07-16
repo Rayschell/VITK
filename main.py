@@ -198,6 +198,72 @@ def apply_filters(image_data):
         print(f"Erreur lors du filtrage: {e}")
         return None
 
+def apply_segmentation(image_data):
+    print("Application de la segmentation")
+    
+    try:
+        import itk
+        
+        segmentation_results = {}
+        
+        for key, data in image_data.items():
+            image = data['image']
+            print(f"Segmentation {key}...")
+            
+            base_name = os.path.splitext(os.path.basename(data['filepath']))[0]
+            
+            # Types d'images
+            ImageType = type(image)
+            FloatImageType = itk.Image[itk.F, 3]
+            UC3ImageType = itk.Image[itk.UC, 3]
+            
+            # Conversion en float
+            cast_to_float = itk.CastImageFilter[ImageType, FloatImageType].New()
+            cast_to_float.SetInput(image)
+            cast_to_float.Update()
+            float_image = cast_to_float.GetOutput()
+            
+            # Seuillage binaire simple
+            threshold_value = float(data['mean_val'] + data['std_dev'])
+            
+            binary_filter = itk.BinaryThresholdImageFilter[FloatImageType, UC3ImageType].New()
+            binary_filter.SetInput(float_image)
+            binary_filter.SetLowerThreshold(threshold_value)
+            binary_filter.SetUpperThreshold(float(data['max_val']))
+            binary_filter.SetInsideValue(255)
+            binary_filter.SetOutsideValue(0)
+            binary_filter.Update()
+            
+            itk.imwrite(binary_filter.GetOutput(), f"Output/{base_name}_binary_seg.png")
+            
+            # Seuillage adaptatif
+            adaptive_lower = float(data['mean_val'])
+            adaptive_upper = float(data['mean_val'] + 2 * data['std_dev'])
+            
+            adaptive_filter = itk.BinaryThresholdImageFilter[FloatImageType, UC3ImageType].New()
+            adaptive_filter.SetInput(float_image)
+            adaptive_filter.SetLowerThreshold(adaptive_lower)
+            adaptive_filter.SetUpperThreshold(adaptive_upper)
+            adaptive_filter.SetInsideValue(255)
+            adaptive_filter.SetOutsideValue(0)
+            adaptive_filter.Update()
+            
+            itk.imwrite(adaptive_filter.GetOutput(), f"Output/{base_name}_adaptive_seg.png")
+            
+            segmentation_results[key] = {
+                'binary': binary_filter.GetOutput(),
+                'adaptive': adaptive_filter.GetOutput()
+            }
+            
+            print(f"Segmentation {key} terminee")
+        
+        print(f"Segmentation terminee pour {len(segmentation_results)} image(s)")
+        return segmentation_results
+        
+    except Exception as e:
+        print(f"Erreur lors de la segmentation: {e}")
+        return None
+
 def main():
     print("ITK/VTK Mini-Project - Traitement d'Images Medicales")
     
@@ -249,7 +315,15 @@ def main():
         filters = apply_filters(results)
         if filters:
             print("Filtrage termine!")
-            return True
+            
+            # Appliquer la segmentation
+            segmentations = apply_segmentation(results)
+            if segmentations:
+                print("Segmentation termine!")
+                return True
+            else:
+                print("Echec de la segmentation")
+                return False
         else:
             print("Echec du filtrage")
             return False
