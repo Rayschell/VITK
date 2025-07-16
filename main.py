@@ -121,6 +121,83 @@ def load_and_analyze_images():
         print(f"Modules ITK non disponibles: {e}")
         return None
 
+def apply_filters(image_data):
+    print("Application des filtres d'images")
+    
+    try:
+        import itk
+        
+        filtered_results = {}
+        
+        for key, data in image_data.items():
+            image = data['image']
+            print(f"Filtrage {key}...")
+            
+            base_name = os.path.splitext(os.path.basename(data['filepath']))[0]
+            
+            # Conversion en 8-bit pour sauvegarde
+            rescaler = itk.RescaleIntensityImageFilter.New(image)
+            rescaler.SetOutputMinimum(0)
+            rescaler.SetOutputMaximum(255)
+            rescaler.Update()
+            
+            # Sauvegarde originale en PNG
+            itk.imwrite(rescaler.GetOutput(), f"Output/{base_name}_original.png")
+            
+            # Filtrage Gaussien sur l'image float
+            ImageType = type(image)
+            FloatImageType = itk.Image[itk.F, 3]
+            
+            cast_to_float = itk.CastImageFilter[ImageType, FloatImageType].New()
+            cast_to_float.SetInput(image)
+            cast_to_float.Update()
+            float_image = cast_to_float.GetOutput()
+            
+            gaussian_filter = itk.SmoothingRecursiveGaussianImageFilter[FloatImageType, FloatImageType].New()
+            gaussian_filter.SetInput(float_image)
+            gaussian_filter.SetSigma(2.0)
+            gaussian_filter.Update()
+            
+            # Sauvegarde Gaussien
+            gauss_rescaler = itk.RescaleIntensityImageFilter[FloatImageType, FloatImageType].New()
+            gauss_rescaler.SetInput(gaussian_filter.GetOutput())
+            gauss_rescaler.SetOutputMinimum(0)
+            gauss_rescaler.SetOutputMaximum(255)
+            gauss_rescaler.Update()
+            
+            UC3ImageType = itk.Image[itk.UC, 3]
+            gauss_caster = itk.CastImageFilter[FloatImageType, UC3ImageType].New()
+            gauss_caster.SetInput(gauss_rescaler.GetOutput())
+            gauss_caster.Update()
+            
+            itk.imwrite(gauss_caster.GetOutput(), f"Output/{base_name}_gaussian.png")
+            
+            # Seuillage binaire
+            threshold_filter = itk.BinaryThresholdImageFilter[FloatImageType, UC3ImageType].New()
+            threshold_filter.SetInput(float_image)
+            threshold_filter.SetLowerThreshold(data['mean_val'])
+            threshold_filter.SetUpperThreshold(data['max_val'])
+            threshold_filter.SetInsideValue(255)
+            threshold_filter.SetOutsideValue(0)
+            threshold_filter.Update()
+            
+            itk.imwrite(threshold_filter.GetOutput(), f"Output/{base_name}_threshold.png")
+            
+            filtered_results[key] = {
+                'original': rescaler.GetOutput(),
+                'gaussian': gauss_caster.GetOutput(),
+                'threshold': threshold_filter.GetOutput()
+            }
+            
+            print(f"Filtrage {key} termine")
+        
+        print(f"Filtrage termine pour {len(filtered_results)} image(s)")
+        return filtered_results
+        
+    except Exception as e:
+        print(f"Erreur lors du filtrage: {e}")
+        return None
+
 def main():
     print("ITK/VTK Mini-Project - Traitement d'Images Medicales")
     
@@ -168,7 +245,14 @@ def main():
     
     if results:
         print("Configuration et analyse terminees!")
-        return True
+        
+        filters = apply_filters(results)
+        if filters:
+            print("Filtrage termine!")
+            return True
+        else:
+            print("Echec du filtrage")
+            return False
     else:
         print("Echec de l'analyse des images")
         return False
